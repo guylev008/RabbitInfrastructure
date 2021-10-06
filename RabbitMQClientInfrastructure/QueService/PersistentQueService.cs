@@ -32,7 +32,7 @@ namespace RabbitMQClientInfrastructure.QueService
 			_persistentConnection = defaultConnection ?? throw new ArgumentNullException(nameof(defaultConnection));
 
 			_producerChannel = CreateProducerChannel();
-			_consumerChannel = CreateConsumerChannel();
+			_consumerChannel = Settings.ConsumersCount > 0 ? CreateConsumerChannel() : null;
 			_basicProperties = _producerChannel.CreateBasicProperties();
 			_basicProperties.Persistent = true;
 			_basicProperties.DeliveryMode = 2;
@@ -44,19 +44,20 @@ namespace RabbitMQClientInfrastructure.QueService
 		{
 			if (_consumerChannel?.IsClosed == false)
 			{
-				_consumerChannel.QueueUnbind(Settings.QueName, Settings.ExchangeName, Settings.RoutingKey);
+				QueueUnbind(_consumerChannel);
 				_consumerChannel.Close();
 				_consumerChannel.Dispose();
 
 			}
 			if (_producerChannel?.IsClosed == false)
 			{
-				_producerChannel.QueueUnbind(Settings.QueName, Settings.ExchangeName, Settings.RoutingKey);
+				QueueUnbind(_producerChannel);
 				_producerChannel.Close();
 				_producerChannel.Dispose();
 			}
 			GC.SuppressFinalize(this);
 		}
+
 
 		public void PublishMessage<T>(T eventMessage) where T : QueEventMessage
 		{
@@ -222,7 +223,7 @@ namespace RabbitMQClientInfrastructure.QueService
 				channel.QueueDeclare(Settings.QueName, true, false, false, arguments);
 			}
 
-			else 
+			else
 			{
 				channel.QueueDeclare(Settings.QueName, true, false, false);
 			}
@@ -277,42 +278,10 @@ namespace RabbitMQClientInfrastructure.QueService
 			_consumerChannel.BasicNack(deliveryTag, multiple, requeue);
 		}
 
-		//private void ReEnqueue(BasicDeliverEventArgs basicDeliverEventArgs)
-		//{
-		//	if (!_persistentConnection.IsConnected)
-		//	{
-		//		_persistentConnection.TryConnect();
-		//	}
-
-		//	var retryCount = GetRetryCount(basicDeliverEventArgs.BasicProperties);
-
-		//	if (retryCount > 0)
-		//	{
-		//		SetRetryProperties(basicDeliverEventArgs.BasicProperties, --retryCount);
-
-		//		_consumerChannel.BasicPublish(basicDeliverEventArgs.Exchange, basicDeliverEventArgs.RoutingKey,
-		//			basicDeliverEventArgs.BasicProperties, basicDeliverEventArgs.Body);
-		//		_consumerChannel.BasicAck(basicDeliverEventArgs.DeliveryTag, false);
-		//		_logger.LogDebug($"Retry, {basicDeliverEventArgs.Body} - {retryCount}");
-		//	}
-		//	else
-		//	{
-		//		_consumerChannel.BasicNack(basicDeliverEventArgs.DeliveryTag, false, false);
-		//		_logger.LogDebug($"BasicNack {basicDeliverEventArgs.Body}");
-		//	}
-
-		//	int GetRetryCount(IBasicProperties properties)
-		//	{
-		//		return (int?)properties.Headers?["Retries"] ?? Settings.MaxRetryCount;
-		//	}
-
-		//	void SetRetryProperties(IBasicProperties properties, int retryCounts)
-		//	{
-		//		var newDelay = Settings.RetryDelay * (Settings.MaxRetryCount - retryCount) * 1000;
-		//		properties.Headers = properties.Headers ?? new Dictionary<string, object>();
-		//		properties.Headers["Retries"] = retryCounts;
-		//		properties.Headers["x-delay"] = newDelay;
-		//	}
-		//}
+		private void QueueUnbind(IModel channel)
+		{
+			if (!string.IsNullOrEmpty(Settings.QueName))
+				channel.QueueUnbind(Settings.QueName, Settings.ExchangeName, Settings.RoutingKey);
+		}
 	}
 }

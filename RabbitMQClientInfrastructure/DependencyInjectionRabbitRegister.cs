@@ -36,8 +36,14 @@ namespace RabbitMQClientInfrastructure
 					ContinuationTimeout = TimeSpan.FromSeconds(60)
 				};
 
+				logger.LogInformation($"[*] Creating new connection : {factory.ClientProvidedName}");
 				return new DefaultConnection(factory, logger, config.RetryConnectionAttempt ?? 5);
 			});
+		}
+
+		public static void AddDynamicQueServiceResolver(this IServiceCollection services)
+		{
+			services.AddSingleton<IDynamicQueServiceResolver, DynamicQueServiceResolver>();
 		}
 	}
 }
